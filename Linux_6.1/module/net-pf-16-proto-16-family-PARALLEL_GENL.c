@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Generic Netlink Test Module
+ *
+ * Implements test families for Generic Netlink functionality:
+ * - TEST_GENL: Basic commands with mutex protection
+ * - PARALLEL_GENL: Advanced ops with parallel dump support  
+ * - THIRD_GENL: Simple message handling supporting many multicast groups
+ * - LARGE_GENL: Stress test with 190+ multicast groups
+ *
+ * Includes sysfs interfaces for manual testing and validation
+ * of error cases and edge conditions.
+ */
+
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -119,6 +133,7 @@ static struct kobj_attribute my_attr_str_parallel_genl = __ATTR(message, 0664, s
 static struct kobj_attribute my_attr_str_third_genl = __ATTR(message, 0664, show_third_genl_message, store_third_genl_message);
 
 static DEFINE_MUTEX(genl_mutex);
+static DEFINE_MUTEX(sysfs_mutex);
 
 #define MY_GENL_FAMILY_NAME "TEST_GENL"
 #define MY_GENL_VERSION 1
@@ -126,6 +141,8 @@ static DEFINE_MUTEX(genl_mutex);
 #define PARALLEL_GENL_FAMILY_NAME "PARALLEL_GENL"
 
 #define THIRD_GENL_FAMILY_NAME "THIRD_GENL"
+
+#define LARGE_GENL_FAMILY_NAME "LARGE_GENL"
 
 #define PATH_GENL_TEST_NUM "/sys/kernel/genl_test/value"
 #define PATH_GENL_TEST_MES "/sys/kernel/genl_test/message"
@@ -866,6 +883,410 @@ static const struct genl_ops parallel_genl_ops[] = {
     },
 };
 
+enum my_multicast_many_groups_one {
+	MCGRP_1,
+    MCGRP_2,
+    MCGRP_3,
+    MCGRP_4,
+    MCGRP_5,
+    MCGRP_6,
+    MCGRP_7,
+    MCGRP_8,
+    MCGRP_9,
+    MCGRP_10,
+    MCGRP_11,
+    MCGRP_12,
+    MCGRP_13,
+    MCGRP_14,
+    MCGRP_15,
+    MCGRP_16,
+    MCGRP_17,
+    MCGRP_18,
+    MCGRP_19,
+    MCGRP_20,
+    MCGRP_21,
+    MCGRP_22,
+    MCGRP_23,
+    MCGRP_24,
+    MCGRP_25,
+    MCGRP_26,
+    MCGRP_27,
+    MCGRP_28,
+    MCGRP_29,
+    MCGRP_30,
+    MCGRP_31,
+    MCGRP_32,
+    MCGRP_33,
+    MCGRP_34,
+    MCGRP_35,
+    MCGRP_36,
+    MCGRP_37,
+    MCGRP_38,
+    MCGRP_39,
+    MCGRP_40,
+    MCGRP_41,
+    MCGRP_42,
+    MCGRP_43,
+    MCGRP_44,
+    MCGRP_45,
+    MCGRP_46,
+    MCGRP_47,
+    MCGRP_48,
+    MCGRP_49,
+    MCGRP_50,
+    MCGRP_51,
+    MCGRP_52,
+    MCGRP_53,
+    MCGRP_54,
+    MCGRP_55,
+    MCGRP_56,
+    MCGRP_57,
+    MCGRP_58,
+    MCGRP_59,
+    MCGRP_60,
+    MCGRP_61,
+    MCGRP_62,
+    MCGRP_63,
+    MCGRP_64,
+    MCGRP_65,
+    MCGRP_66,
+    MCGRP_67,
+    MCGRP_68,
+    MCGRP_69,
+    MCGRP_70,
+    MCGRP_71,
+    MCGRP_72,
+    MCGRP_73,
+    MCGRP_74,
+    MCGRP_75,
+    MCGRP_76,
+    MCGRP_77,
+    MCGRP_78,
+    MCGRP_79,
+    MCGRP_80,
+    MCGRP_81,
+    MCGRP_82,
+    MCGRP_83,
+    MCGRP_84,
+    MCGRP_85,
+    MCGRP_86,
+    MCGRP_87,
+    MCGRP_88,
+    MCGRP_89,
+    MCGRP_90,
+    MCGRP_91,
+    MCGRP_92,
+    MCGRP_93,
+    MCGRP_94,
+    MCGRP_95,
+    MCGRP_96,
+    MCGRP_97,
+    MCGRP_98,
+    MCGRP_99,
+    MCGRP_100,
+    MCGRP_101,
+    MCGRP_102,
+    MCGRP_103,
+    MCGRP_104,
+    MCGRP_105,
+    MCGRP_106,
+    MCGRP_107,
+    MCGRP_108,
+    MCGRP_109,
+    MCGRP_110,
+    MCGRP_111,
+    MCGRP_112,
+    MCGRP_113,
+    MCGRP_114,
+    MCGRP_115,
+    MCGRP_116,
+    MCGRP_117,
+    MCGRP_118,
+    MCGRP_119,
+    MCGRP_120,
+    MCGRP_121,
+    MCGRP_122,
+    MCGRP_123,
+    MCGRP_124,
+    MCGRP_125,
+    MCGRP_126,
+    MCGRP_127,
+    MCGRP_128,
+    MCGRP_129,
+    MCGRP_130,
+    MCGRP_131,
+    MCGRP_132,
+    MCGRP_133,
+    MCGRP_134,
+    MCGRP_135,
+    MCGRP_136,
+    MCGRP_137,
+    MCGRP_138,
+    MCGRP_139,
+    MCGRP_140,
+    MCGRP_141,
+    MCGRP_142,
+    MCGRP_143,
+    MCGRP_144,
+    MCGRP_145,
+    MCGRP_146,
+    MCGRP_147,
+    MCGRP_148,
+    MCGRP_149,
+    MCGRP_150,
+    MCGRP_151,
+    MCGRP_152,
+    MCGRP_153,
+    MCGRP_154,
+    MCGRP_155,
+    MCGRP_156,
+    MCGRP_157,
+    MCGRP_158,
+    MCGRP_159,
+    MCGRP_160,
+    MCGRP_161,
+    MCGRP_162,
+    MCGRP_163,
+    MCGRP_164,
+    MCGRP_165,
+    MCGRP_166,
+    MCGRP_167,
+    MCGRP_168,
+    MCGRP_169,
+    MCGRP_170,
+    MCGRP_171,
+    MCGRP_172,
+    MCGRP_173,
+    MCGRP_174,
+    MCGRP_175,
+    MCGRP_176,
+    MCGRP_177,
+    MCGRP_178,
+    MCGRP_179,
+    MCGRP_180,
+    MCGRP_181,
+    MCGRP_182,
+    MCGRP_183,
+    MCGRP_184,
+    MCGRP_185,
+    MCGRP_186,
+    MCGRP_187,
+    MCGRP_188,
+    MCGRP_189,
+    MCGRP_190,
+    MCGRP_191,
+    MCGRP_192,
+    MCGRP_193,
+    MCGRP_194,
+    MCGRP_195,
+    MCGRP_196,
+    MCGRP_197,
+    MCGRP_198,
+    MCGRP_199,
+};
+
+static const struct genl_multicast_group genl_many_mcgrps_one[] = {
+	[MCGRP_1] = { .name = "MCGRP_1", },
+    [MCGRP_2] = { .name = "MCGRP_2", },
+    [MCGRP_3] = { .name = "MCGRP_3", },
+    [MCGRP_4] = { .name = "MCGRP_4", },
+    [MCGRP_5] = { .name = "MCGRP_5", },
+    [MCGRP_6] = { .name = "MCGRP_6", },
+    [MCGRP_7] = { .name = "MCGRP_7", },
+    [MCGRP_8] = { .name = "MCGRP_8", },
+    [MCGRP_9] = { .name = "MCGRP_9", },
+    [MCGRP_10] = { .name = "MCGRP_10", },
+    [MCGRP_11] = { .name = "MCGRP_11", },
+    [MCGRP_12] = { .name = "MCGRP_12", },
+    [MCGRP_13] = { .name = "MCGRP_13", },
+    [MCGRP_14] = { .name = "MCGRP_14", },
+    [MCGRP_15] = { .name = "MCGRP_15", },
+    [MCGRP_16] = { .name = "MCGRP_16", },
+    [MCGRP_17] = { .name = "MCGRP_17", },
+    [MCGRP_18] = { .name = "MCGRP_18", },
+    [MCGRP_19] = { .name = "MCGRP_19", },
+    [MCGRP_20] = { .name = "MCGRP_20", },
+    [MCGRP_21] = { .name = "MCGRP_21", },
+    [MCGRP_22] = { .name = "MCGRP_22", },
+    [MCGRP_23] = { .name = "MCGRP_23", },
+    [MCGRP_24] = { .name = "MCGRP_24", },
+    [MCGRP_25] = { .name = "MCGRP_25", },
+    [MCGRP_26] = { .name = "MCGRP_26", },
+    [MCGRP_27] = { .name = "MCGRP_27", },
+    [MCGRP_28] = { .name = "MCGRP_28", },
+    [MCGRP_29] = { .name = "MCGRP_29", },
+    [MCGRP_30] = { .name = "MCGRP_30", },
+    [MCGRP_31] = { .name = "MCGRP_31", },
+    [MCGRP_32] = { .name = "MCGRP_32", },
+    [MCGRP_33] = { .name = "MCGRP_33", },
+    [MCGRP_34] = { .name = "MCGRP_34", },
+    [MCGRP_35] = { .name = "MCGRP_35", },
+    [MCGRP_36] = { .name = "MCGRP_36", },
+    [MCGRP_37] = { .name = "MCGRP_37", },
+    [MCGRP_38] = { .name = "MCGRP_38", },
+    [MCGRP_39] = { .name = "MCGRP_39", },
+    [MCGRP_40] = { .name = "MCGRP_40", },
+    [MCGRP_41] = { .name = "MCGRP_41", },
+    [MCGRP_42] = { .name = "MCGRP_42", },
+    [MCGRP_43] = { .name = "MCGRP_43", },
+    [MCGRP_44] = { .name = "MCGRP_44", },
+    [MCGRP_45] = { .name = "MCGRP_45", },
+    [MCGRP_46] = { .name = "MCGRP_46", },
+    [MCGRP_47] = { .name = "MCGRP_47", },
+    [MCGRP_48] = { .name = "MCGRP_48", },
+    [MCGRP_49] = { .name = "MCGRP_49", },
+    [MCGRP_50] = { .name = "MCGRP_50", },
+    [MCGRP_51] = { .name = "MCGRP_51", },
+    [MCGRP_52] = { .name = "MCGRP_52", },
+    [MCGRP_53] = { .name = "MCGRP_53", },
+    [MCGRP_54] = { .name = "MCGRP_54", },
+    [MCGRP_55] = { .name = "MCGRP_55", },
+    [MCGRP_56] = { .name = "MCGRP_56", },
+    [MCGRP_57] = { .name = "MCGRP_57", },
+    [MCGRP_58] = { .name = "MCGRP_58", },
+    [MCGRP_59] = { .name = "MCGRP_59", },
+    [MCGRP_60] = { .name = "MCGRP_60", },
+    [MCGRP_61] = { .name = "MCGRP_61", },
+    [MCGRP_62] = { .name = "MCGRP_62", },
+    [MCGRP_63] = { .name = "MCGRP_63", },
+    [MCGRP_64] = { .name = "MCGRP_64", },
+    [MCGRP_65] = { .name = "MCGRP_65", },
+    [MCGRP_66] = { .name = "MCGRP_66", },
+    [MCGRP_67] = { .name = "MCGRP_67", },
+    [MCGRP_68] = { .name = "MCGRP_68", },
+    [MCGRP_69] = { .name = "MCGRP_69", },
+    [MCGRP_70] = { .name = "MCGRP_70", },
+    [MCGRP_71] = { .name = "MCGRP_71", },
+    [MCGRP_72] = { .name = "MCGRP_72", },
+    [MCGRP_73] = { .name = "MCGRP_73", },
+    [MCGRP_74] = { .name = "MCGRP_74", },
+    [MCGRP_75] = { .name = "MCGRP_75", },
+    [MCGRP_76] = { .name = "MCGRP_76", },
+    [MCGRP_77] = { .name = "MCGRP_77", },
+    [MCGRP_78] = { .name = "MCGRP_78", },
+    [MCGRP_79] = { .name = "MCGRP_79", },
+    [MCGRP_80] = { .name = "MCGRP_80", },
+    [MCGRP_81] = { .name = "MCGRP_81", },
+    [MCGRP_82] = { .name = "MCGRP_82", },
+    [MCGRP_83] = { .name = "MCGRP_83", },
+    [MCGRP_84] = { .name = "MCGRP_84", },
+    [MCGRP_85] = { .name = "MCGRP_85", },
+    [MCGRP_86] = { .name = "MCGRP_86", },
+    [MCGRP_87] = { .name = "MCGRP_87", },
+    [MCGRP_88] = { .name = "MCGRP_88", },
+    [MCGRP_89] = { .name = "MCGRP_89", },
+    [MCGRP_90] = { .name = "MCGRP_90", },
+    [MCGRP_91] = { .name = "MCGRP_91", },
+    [MCGRP_92] = { .name = "MCGRP_92", },
+    [MCGRP_93] = { .name = "MCGRP_93", },
+    [MCGRP_94] = { .name = "MCGRP_94", },
+    [MCGRP_95] = { .name = "MCGRP_95", },
+    [MCGRP_96] = { .name = "MCGRP_96", },
+    [MCGRP_97] = { .name = "MCGRP_97", },
+    [MCGRP_98] = { .name = "MCGRP_98", },
+    [MCGRP_99] = { .name = "MCGRP_99", },
+    [MCGRP_100] = { .name = "MCGRP_100", },
+    [MCGRP_101] = { .name = "MCGRP_101", },
+    [MCGRP_102] = { .name = "MCGRP_102", },
+    [MCGRP_103] = { .name = "MCGRP_103", },
+    [MCGRP_104] = { .name = "MCGRP_104", },
+    [MCGRP_105] = { .name = "MCGRP_105", },
+    [MCGRP_106] = { .name = "MCGRP_106", },
+    [MCGRP_107] = { .name = "MCGRP_107", },
+    [MCGRP_108] = { .name = "MCGRP_108", },
+    [MCGRP_109] = { .name = "MCGRP_109", },
+    [MCGRP_110] = { .name = "MCGRP_100", },
+    [MCGRP_111] = { .name = "MCGRP_111", },
+    [MCGRP_112] = { .name = "MCGRP_112", },
+    [MCGRP_113] = { .name = "MCGRP_113", },
+    [MCGRP_114] = { .name = "MCGRP_114", },
+    [MCGRP_115] = { .name = "MCGRP_115", },
+    [MCGRP_116] = { .name = "MCGRP_116", },
+    [MCGRP_117] = { .name = "MCGRP_117", },
+    [MCGRP_118] = { .name = "MCGRP_118", },
+    [MCGRP_119] = { .name = "MCGRP_119", },
+    [MCGRP_120] = { .name = "MCGRP_120", },
+    [MCGRP_121] = { .name = "MCGRP_121", },
+    [MCGRP_122] = { .name = "MCGRP_122", },
+    [MCGRP_123] = { .name = "MCGRP_123", },
+    [MCGRP_124] = { .name = "MCGRP_124", },
+    [MCGRP_125] = { .name = "MCGRP_125", },
+    [MCGRP_126] = { .name = "MCGRP_126", },
+    [MCGRP_127] = { .name = "MCGRP_127", },
+    [MCGRP_128] = { .name = "MCGRP_128", },
+    [MCGRP_129] = { .name = "MCGRP_129", },
+    [MCGRP_130] = { .name = "MCGRP_130", },
+    [MCGRP_131] = { .name = "MCGRP_131", },
+    [MCGRP_132] = { .name = "MCGRP_132", },
+    [MCGRP_133] = { .name = "MCGRP_133", },
+    [MCGRP_134] = { .name = "MCGRP_134", },
+    [MCGRP_135] = { .name = "MCGRP_135", },
+    [MCGRP_136] = { .name = "MCGRP_136", },
+    [MCGRP_137] = { .name = "MCGRP_137", },
+    [MCGRP_138] = { .name = "MCGRP_138", },
+    [MCGRP_139] = { .name = "MCGRP_139", },
+    [MCGRP_140] = { .name = "MCGRP_140", },
+    [MCGRP_141] = { .name = "MCGRP_141", },
+    [MCGRP_142] = { .name = "MCGRP_142", },
+    [MCGRP_143] = { .name = "MCGRP_143", },
+    [MCGRP_144] = { .name = "MCGRP_144", },
+    [MCGRP_145] = { .name = "MCGRP_145", },
+    [MCGRP_146] = { .name = "MCGRP_146", },
+    [MCGRP_147] = { .name = "MCGRP_147", },
+    [MCGRP_148] = { .name = "MCGRP_148", },
+    [MCGRP_149] = { .name = "MCGRP_149", },
+    [MCGRP_150] = { .name = "MCGRP_150", },
+    [MCGRP_151] = { .name = "MCGRP_151", },
+    [MCGRP_152] = { .name = "MCGRP_152", },
+    [MCGRP_153] = { .name = "MCGRP_153", },
+    [MCGRP_154] = { .name = "MCGRP_154", },
+    [MCGRP_155] = { .name = "MCGRP_155", },
+    [MCGRP_156] = { .name = "MCGRP_156", },
+    [MCGRP_157] = { .name = "MCGRP_157", },
+    [MCGRP_158] = { .name = "MCGRP_158", },
+    [MCGRP_159] = { .name = "MCGRP_159", },
+    [MCGRP_160] = { .name = "MCGRP_160", },
+    [MCGRP_161] = { .name = "MCGRP_161", },
+    [MCGRP_162] = { .name = "MCGRP_162", },
+    [MCGRP_163] = { .name = "MCGRP_163", },
+    [MCGRP_164] = { .name = "MCGRP_164", },
+    [MCGRP_165] = { .name = "MCGRP_165", },
+    [MCGRP_166] = { .name = "MCGRP_166", },
+    [MCGRP_167] = { .name = "MCGRP_167", },
+    [MCGRP_168] = { .name = "MCGRP_168", },
+    [MCGRP_169] = { .name = "MCGRP_169", },
+    [MCGRP_170] = { .name = "MCGRP_170", },
+    [MCGRP_171] = { .name = "MCGRP_171", },
+    [MCGRP_172] = { .name = "MCGRP_172", },
+    [MCGRP_173] = { .name = "MCGRP_173", },
+    [MCGRP_174] = { .name = "MCGRP_174", },
+    [MCGRP_175] = { .name = "MCGRP_175", },
+    [MCGRP_176] = { .name = "MCGRP_176", },
+    [MCGRP_177] = { .name = "MCGRP_177", },
+    [MCGRP_178] = { .name = "MCGRP_178", },
+    [MCGRP_179] = { .name = "MCGRP_179", },
+    [MCGRP_180] = { .name = "MCGRP_180", },
+    [MCGRP_181] = { .name = "MCGRP_181", },
+    [MCGRP_182] = { .name = "MCGRP_182", },
+    [MCGRP_183] = { .name = "MCGRP_183", },
+    [MCGRP_184] = { .name = "MCGRP_184", },
+    [MCGRP_185] = { .name = "MCGRP_185", },
+    [MCGRP_186] = { .name = "MCGRP_186", },
+    [MCGRP_187] = { .name = "MCGRP_187", },
+    [MCGRP_188] = { .name = "MCGRP_188", },
+    [MCGRP_189] = { .name = "MCGRP_189", },
+    [MCGRP_190] = { .name = "MCGRP_190", },
+    [MCGRP_191] = { .name = "MCGRP_191", },
+    [MCGRP_192] = { .name = "MCGRP_192", },
+    [MCGRP_193] = { .name = "MCGRP_193", },
+    [MCGRP_194] = { .name = "MCGRP_194", },
+    [MCGRP_195] = { .name = "MCGRP_195", },
+    [MCGRP_196] = { .name = "MCGRP_196", },
+    [MCGRP_197] = { .name = "MCGRP_197", },
+    [MCGRP_198] = { .name = "MCGRP_198", },
+    [MCGRP_199] = { .name = "MCGRP_199", },
+};
+
 enum my_multicast_many_groups_two {
 	MCGRP_TWO_1,
     MCGRP_TWO_2,
@@ -1112,6 +1533,42 @@ static struct genl_family third_genl_family = {
     .policy = third_genl_policy,
 };
 
+// LARGE_GENL
+enum {
+    LARGE_GENL_CMD_UNSPEC,
+    LARGE_GENL_CMD_ECHO,
+    __LARGE_GENL_CMD_MAX,
+};
+#define LARGE_GENL_CMD_MAX (__LARGE_GENL_CMD_MAX - 1)
+
+static int large_genl_echo(struct sk_buff *skb, struct genl_info *info) 
+{
+    return 0; 
+}
+
+// Generic Netlink operations for LARGE_GENL family
+static const struct genl_ops large_genl_ops[] = {
+    {
+        .cmd = LARGE_GENL_CMD_ECHO,
+        .flags = 0,
+        .doit = large_genl_echo,
+        .dumpit = NULL,
+    },
+};
+
+// genl_family struct for LARGE_GENL family
+static struct genl_family large_genl_family = {
+    .hdrsize = 0,
+    .name = LARGE_GENL_FAMILY_NAME,
+    .version = 1,
+    .maxattr = 1,
+    .netnsok = true,
+    .ops = large_genl_ops,
+    .n_ops = ARRAY_SIZE(large_genl_ops),
+    .mcgrps = genl_many_mcgrps_one,
+    .n_mcgrps = ARRAY_SIZE(genl_many_mcgrps_one),
+};
+
 // genl_family struct with incorrect name
 static struct genl_family incorrect_genl_family = {
     .hdrsize = 0,
@@ -1178,14 +1635,21 @@ static int __init init_netlink(void)
 		goto failure_2;
     }
 
-    rc = genl_register_family(&third_genl_family);
+    rc = genl_register_family(&large_genl_family);
     if (rc) {
         printk(KERN_ERR "init_netlink: Failed to register Generic Netlink family\n");
 		goto failure_3;
     }
 
-	return 0;
+    rc = genl_register_family(&third_genl_family);
+    if (rc) {
+        printk(KERN_ERR "init_netlink: Failed to register Generic Netlink family\n");
+		goto failure_4;
+    }
 
+	return 0;
+failure_4:
+    genl_unregister_family(&large_genl_family);
 failure_3:
     genl_unregister_family(&my_genl_family_parallel);
 failure_2:
@@ -1357,6 +1821,7 @@ err_family:
     genl_unregister_family(&my_genl_family);
     genl_unregister_family(&my_genl_family_parallel);
     genl_unregister_family(&third_genl_family);
+    genl_unregister_family(&large_genl_family);
 err_sysfs:
     sysfs_remove_file(kobj_genl_test, &my_attr_u32_genl_test.attr);
     sysfs_remove_file(kobj_genl_test, &my_attr_str_genl_test.attr);
@@ -1377,6 +1842,7 @@ static void __exit my_sysfs_exit(void)
     genl_unregister_family(&my_genl_family);
     genl_unregister_family(&my_genl_family_parallel);
     genl_unregister_family(&third_genl_family);
+    genl_unregister_family(&large_genl_family);
 
     sysfs_remove_file(kobj_genl_test, &my_attr_u32_genl_test.attr);
     sysfs_remove_file(kobj_genl_test, &my_attr_str_genl_test.attr);
