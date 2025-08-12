@@ -1021,6 +1021,18 @@ static struct genl_family my_genl_family_parallel = {
     .n_mcgrps = ARRAY_SIZE(genl_many_mcgrps_two),
 };
 
+// genl_family struct with incorrect name
+static struct genl_family incorrect_genl_family = {
+    .hdrsize = 0,
+    .name = MY_GENL_FAMILY_NAME,   // such family already exists
+    .version = MY_GENL_VERSION,
+    .maxattr = MY_GENL_ATTR_MAX,
+    .netnsok = true,
+    .ops = my_genl_ops,
+    .n_ops = ARRAY_SIZE(my_genl_ops),
+    .policy = my_genl_policy,
+};
+
 static int __init init_netlink(void)
 {
 	int rc;
@@ -1046,6 +1058,25 @@ failure_2:
 failure_1:
 	pr_debug("init_netlink: My module. Error occurred in %s\n", __func__);
 	return rc;
+}
+
+static int __init incorrect_init_netlink(void)
+{
+	int rc;
+
+	printk(KERN_INFO "incorrect_init_netlink: My module. Initializing incorrect Netlink\n");
+
+	rc = genl_register_family(&incorrect_genl_family);
+	if (rc) {
+        printk(KERN_ERR "incorrect_init_netlink: Failed to register incorrect Generic Netlink family\n");
+		goto failure;
+    }
+
+	return 0;
+
+failure:
+	printk(KERN_INFO "incorrect_init_netlink: Error was handled correctly\n");
+	return -EINVAL;
 }
 
 static int __init init_sysfs_third_genl(void) 
@@ -1157,6 +1188,10 @@ static int __init module_netlink_init(void)
     if (ret)
         goto err_sysfs;
     printk(KERN_INFO "my_sysfs_init: New families are registered\n");
+
+    ret = incorrect_init_netlink();
+    if (ret)
+        printk(KERN_ERR "my_sysfs_init: Incorrect Generic Netlink family wasn't registered\n");
 
     return 0;
 
