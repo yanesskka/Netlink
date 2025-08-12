@@ -1033,6 +1033,33 @@ static struct genl_family incorrect_genl_family = {
     .policy = my_genl_policy,
 };
 
+enum {
+    INCORRECT_OP_WITH_NULL,
+};
+
+// Generic Netlink operations with incorrect ops
+static const struct genl_ops incorrect_ops_with_null[] = {
+    {
+        .cmd = INCORRECT_OP_WITH_NULL,
+        .flags = 0,
+        .policy = my_genl_policy,  // random policy
+        .doit = NULL,              // doit and dumpit are NULL --> kernel will send -EINVAL
+        .dumpit = NULL,
+    },
+};
+
+// genl_family struct with incorrect ops
+static struct genl_family incorrect_ops_genl_family = {
+    .hdrsize = 0,
+    .name = "INCORRECT",
+    .version = 1,
+    .maxattr = 1,
+    .netnsok = true,
+    .ops = incorrect_ops_with_null,      // ops contain NULL
+    .n_ops = ARRAY_SIZE(incorrect_ops_with_null),
+    .policy = my_genl_policy,            // random policy
+};
+
 static int __init init_netlink(void)
 {
 	int rc;
@@ -1058,6 +1085,15 @@ failure_2:
 failure_1:
 	pr_debug("init_netlink: My module. Error occurred in %s\n", __func__);
 	return rc;
+}
+
+static int __init incorrect_ops_netlink(void) 
+{
+    int ret;
+    ret = genl_register_family(&incorrect_ops_genl_family);
+    if (ret != -EINVAL)
+        return ret;
+    return 0;
 }
 
 static int __init incorrect_init_netlink(void)
@@ -1181,6 +1217,10 @@ static int __init module_netlink_init(void)
         goto err_sysfs;
 
     ret = init_sysfs_third_genl();
+    if (ret)
+        goto err_sysfs;
+
+    ret = incorrect_ops_netlink();
     if (ret)
         goto err_sysfs;
 
