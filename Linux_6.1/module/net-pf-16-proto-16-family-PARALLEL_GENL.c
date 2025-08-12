@@ -125,10 +125,13 @@ static DEFINE_MUTEX(genl_mutex);
 
 #define PARALLEL_GENL_FAMILY_NAME "PARALLEL_GENL"
 
+#define THIRD_GENL_FAMILY_NAME "THIRD_GENL"
+
 #define PATH_GENL_TEST_NUM "/sys/kernel/genl_test/value"
 #define PATH_GENL_TEST_MES "/sys/kernel/genl_test/message"
 #define PATH_GENL_TEST_DEV "/sys/kernel/genl_test/some_info"
 #define PATH_PARALLEL_GENL_MES "/sys/kernel/parallel_genl/message"
+#define PATH_THIRD_GENL_MES "/sys/kernel/third_genl/message"
 
 // TEST_GENL
 enum {
@@ -172,6 +175,8 @@ static const struct nla_policy my_genl_policy[MY_GENL_ATTR_MAX + 1] = {
 static struct genl_family my_genl_family;
 
 static struct genl_family my_genl_family_parallel;
+
+static struct genl_family third_genl_family;
 
 enum my_multicast_groups {
 	MY_MCGRP_GENL,
@@ -1021,6 +1026,92 @@ static struct genl_family my_genl_family_parallel = {
     .n_mcgrps = ARRAY_SIZE(genl_many_mcgrps_two),
 };
 
+// THIRD_GENL
+enum {
+    THIRD_GENL_ATTR_UNSPEC,
+    THIRD_GENL_ATTR_DATA,
+    THIRD_GENL_ATTR_FLAG,
+    __THIRD_GENL_ATTR_MAX,
+};
+#define THIRD_GENL_ATTR_MAX (__THIRD_GENL_ATTR_MAX - 1)
+
+enum {
+    THIRD_GENL_CMD_UNSPEC,
+    THIRD_GENL_CMD_ECHO,
+    __THIRD_GENL_CMD_MAX,
+};
+#define THIRD_GENL_CMD_MAX (__THIRD_GENL_CMD_MAX - 1)
+
+static const struct nla_policy third_genl_policy[THIRD_GENL_ATTR_MAX + 1] = {
+    [THIRD_GENL_ATTR_UNSPEC] = {.type = NLA_UNSPEC},
+    [THIRD_GENL_ATTR_DATA]  = {.type = NLA_STRING},
+    [THIRD_GENL_ATTR_FLAG] = {.type = NLA_FLAG},
+};
+
+// Functions for THIRD_GENL family
+static int third_genl_echo(struct sk_buff *skb, struct genl_info *info) 
+{
+    struct sk_buff *msg;
+	void *data;
+	int ret;
+    char *str;
+
+    if (info->nlhdr->nlmsg_flags & NLM_F_ECHO) {
+
+        msg = genlmsg_new(GENLMSG_DEFAULT_SIZE, GFP_KERNEL);
+        if (!msg)
+            return -ENOMEM;
+
+        data = genlmsg_put_reply(msg, info, &my_genl_family, 0, THIRD_GENL_CMD_ECHO);
+        if (!data)
+            goto error;
+
+        str = "Hello from THIRD_GENL!";
+        strcpy(sysfs_data.third_genl_message, str);
+
+        ret = nla_put_string(msg, THIRD_GENL_ATTR_DATA, str);
+        if (ret < 0)
+            goto error;
+
+        ret = nla_put_flag(msg, THIRD_GENL_ATTR_FLAG);
+        if (ret < 0)
+            goto error;
+
+        genlmsg_end(msg, data);
+
+        genlmsg_reply(msg, info);
+    }
+
+	return 0;
+
+error:
+	nlmsg_free(msg);
+    return -EMSGSIZE;
+}
+
+// Generic Netlink operations for THIRD_GENL family
+static const struct genl_ops third_genl_ops[] = {
+    {
+        .cmd = THIRD_GENL_CMD_ECHO,
+        .flags = 0,
+        .policy = third_genl_policy,
+        .doit = third_genl_echo,
+        .dumpit = NULL,
+    },
+};
+
+// genl_family struct for THIRD_GENL family
+static struct genl_family third_genl_family = {
+    .hdrsize = 0,
+    .name = THIRD_GENL_FAMILY_NAME,
+    .version = 1,
+    .maxattr = THIRD_GENL_ATTR_MAX,
+    .netnsok = true,
+    .ops = third_genl_ops,
+    .n_ops = ARRAY_SIZE(third_genl_ops),
+    .policy = third_genl_policy,
+};
+
 // genl_family struct with incorrect name
 static struct genl_family incorrect_genl_family = {
     .hdrsize = 0,
@@ -1087,8 +1178,16 @@ static int __init init_netlink(void)
 		goto failure_2;
     }
 
+    rc = genl_register_family(&third_genl_family);
+    if (rc) {
+        printk(KERN_ERR "init_netlink: Failed to register Generic Netlink family\n");
+		goto failure_3;
+    }
+
 	return 0;
 
+failure_3:
+    genl_unregister_family(&my_genl_family_parallel);
 failure_2:
     genl_unregister_family(&my_genl_family);
 failure_1:
@@ -1213,7 +1312,7 @@ err_sysfs:
     return ret;
 }
 
-static int __init module_netlink_init(void) 
+static int __init my_sysfs_init(void) 
 {
     int ret;
 
@@ -1248,10 +1347,11 @@ static int __init module_netlink_init(void)
 
     return 0;
 
-   // netlink_unregister_notifier(&genl_notifier);
+    // netlink_unregister_notifier(&genl_notifier);
 err_family:
     genl_unregister_family(&my_genl_family);
     genl_unregister_family(&my_genl_family_parallel);
+    genl_unregister_family(&third_genl_family);
 err_sysfs:
     sysfs_remove_file(kobj_genl_test, &my_attr_u32_genl_test.attr);
     sysfs_remove_file(kobj_genl_test, &my_attr_str_genl_test.attr);
@@ -1266,11 +1366,12 @@ err_sysfs:
     return ret;
 }
 
-static void __exit module_netlink_exit(void) 
+static void __exit my_sysfs_exit(void) 
 {
     netlink_unregister_notifier(&genl_notifier);
     genl_unregister_family(&my_genl_family);
     genl_unregister_family(&my_genl_family_parallel);
+    genl_unregister_family(&third_genl_family);
 
     sysfs_remove_file(kobj_genl_test, &my_attr_u32_genl_test.attr);
     sysfs_remove_file(kobj_genl_test, &my_attr_str_genl_test.attr);
@@ -1285,5 +1386,5 @@ static void __exit module_netlink_exit(void)
     printk(KERN_INFO "my_sysfs_exit: Module is exited\n");
 }
 
-module_init(module_netlink_init);
-module_exit(module_netlink_exit);
+module_init(my_sysfs_init);
+module_exit(my_sysfs_exit);
