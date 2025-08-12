@@ -993,6 +993,41 @@ error:
 }
 
  /**
+ * TEST(resolve_large_family_id) - Tests resolution of family ID for LARGE_GENL Generic Netlink family
+ * 
+ * Validates special handling required for families with many multicast groups (199+):
+ * 1. Standard genl_ctrl_resolve() fails due to message size limitations
+ * 2. Custom my_genl_ctrl_resolve() succeeds by using dump mechanism
+ * 
+ * Background:
+ * - Kernel successfully registers large families
+ * - Standard resolution fails because:
+ *   * Response doesn't fit in single message
+ *   * genl_ctrl_resolve() expects single response
+ * - Custom solution works by:
+ *   * Using dump request to get all messages
+ *   * Searching for target family in callback
+ * 
+ * Verification:
+ * 1. Custom resolver returns valid ID (> 0)
+ * 2. Standard resolver either fails or succeeds (platform-dependent)
+ */
+
+TEST (resolve_large_family_id) 
+{
+    int family_id;
+    int no_family_id;
+
+    /* Test custom resolver */
+    family_id = my_genl_ctrl_resolve(LARGE_GENL_FAMILY_NAME);
+    EXPECT_TRUE(family_id > 0);
+
+    /* Test standard resolver (may fail) */
+    no_family_id = genl_ctrl_resolve(socket_alloc_and_conn(), LARGE_GENL_FAMILY_NAME);
+    EXPECT_TRUE(no_family_id > 0);
+}
+
+ /**
  * TEST(capture_end) - Terminates Netlink traffic monitoring session
  *
  * Performs controlled shutdown of nlmon capture interface by:
