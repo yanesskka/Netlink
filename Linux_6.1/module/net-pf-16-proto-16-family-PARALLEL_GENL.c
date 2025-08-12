@@ -1060,6 +1060,15 @@ static struct genl_family incorrect_ops_genl_family = {
     .policy = my_genl_policy,            // random policy
 };
 
+static int ntf_genl_event(struct notifier_block * nb, unsigned long state, void *_notify)
+{
+	return NOTIFY_OK;
+}
+
+static struct notifier_block genl_notifier = {
+	.notifier_call  = ntf_genl_event,
+};
+
 static int __init init_netlink(void)
 {
 	int rc;
@@ -1233,8 +1242,16 @@ static int __init module_netlink_init(void)
     if (ret)
         printk(KERN_ERR "my_sysfs_init: Incorrect Generic Netlink family wasn't registered\n");
 
+    ret = netlink_register_notifier(&genl_notifier);
+    if (ret)
+        goto err_family;
+
     return 0;
 
+   // netlink_unregister_notifier(&genl_notifier);
+err_family:
+    genl_unregister_family(&my_genl_family);
+    genl_unregister_family(&my_genl_family_parallel);
 err_sysfs:
     sysfs_remove_file(kobj_genl_test, &my_attr_u32_genl_test.attr);
     sysfs_remove_file(kobj_genl_test, &my_attr_str_genl_test.attr);
@@ -1251,6 +1268,7 @@ err_sysfs:
 
 static void __exit module_netlink_exit(void) 
 {
+    netlink_unregister_notifier(&genl_notifier);
     genl_unregister_family(&my_genl_family);
     genl_unregister_family(&my_genl_family_parallel);
 
