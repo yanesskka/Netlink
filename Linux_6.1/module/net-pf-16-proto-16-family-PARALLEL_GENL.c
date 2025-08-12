@@ -1,3 +1,17 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Generic Netlink Test Module
+ *
+ * Implements test families for Generic Netlink functionality:
+ * - TEST_GENL: Basic commands with mutex protection
+ * - PARALLEL_GENL: Advanced ops with parallel dump support  
+ * - THIRD_GENL: Simple message handling supporting many multicast groups
+ * - LARGE_GENL: Stress test with 190+ multicast groups
+ *
+ * Includes sysfs interfaces for manual testing and validation
+ * of error cases and edge conditions.
+ */
+
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -19,10 +33,8 @@
 #include <net/rtnetlink.h>
 #include <linux/notifier.h>
 #include <linux/mutex.h>
-// #include "genl_module.h"
 
 MODULE_LICENSE("GPL");
-
 
 static struct kobject *kobj_genl_test;
 static struct device *dev_genl_test;
@@ -59,43 +71,51 @@ static ssize_t store_genl_test_info(struct device *dev, struct device_attribute 
         return count;
 }
 
-static ssize_t show_genl_test_message(struct kobject *kobj, struct kobj_attribute *attr, char *buf) {
+static ssize_t show_genl_test_message(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
+{
         return sprintf(buf, "%s", sysfs_data.genl_test_message);
 }
     
-static ssize_t store_genl_test_message(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) {
+static ssize_t store_genl_test_message(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) 
+{
         size_t len = min(count, sizeof(sysfs_data.genl_test_message) - 1);
         strncpy(sysfs_data.genl_test_message, buf, len);
         sysfs_data.genl_test_message[len] = '\0';
         return count;
 }
 
-static ssize_t show_genl_test_value(struct kobject *kobj, struct kobj_attribute *attr, char *buf) {
+static ssize_t show_genl_test_value(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
+{
     return sprintf(buf, "%d", sysfs_data.genl_test_value);
 }
 
-static ssize_t store_genl_test_value(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) {
+static ssize_t store_genl_test_value(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) 
+{
     int rt;
     rt = kstrtouint(buf, 0, &sysfs_data.genl_test_value);
     return count;
 }
 
-static ssize_t show_parallel_genl_message(struct kobject *kobj, struct kobj_attribute *attr, char *buf) {
+static ssize_t show_parallel_genl_message(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
+{
     return sprintf(buf, "%s", sysfs_data.parallel_genl_message);
 }
 
-static ssize_t store_parallel_genl_message(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) {
+static ssize_t store_parallel_genl_message(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) 
+{
     size_t len = min(count, sizeof(sysfs_data.parallel_genl_message) - 1);
     strncpy(sysfs_data.parallel_genl_message, buf, len);
     sysfs_data.parallel_genl_message[len] = '\0';
     return count;
 }
 
-static ssize_t show_third_genl_message(struct kobject *kobj, struct kobj_attribute *attr, char *buf) {
+static ssize_t show_third_genl_message(struct kobject *kobj, struct kobj_attribute *attr, char *buf) 
+{
     return sprintf(buf, "%s", sysfs_data.third_genl_message);
 }
 
-static ssize_t store_third_genl_message(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) {
+static ssize_t store_third_genl_message(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count) 
+{
     size_t len = min(count, sizeof(sysfs_data.third_genl_message) - 1);
     strncpy(sysfs_data.third_genl_message, buf, len);
     sysfs_data.third_genl_message[len] = '\0';
@@ -130,7 +150,7 @@ static DEFINE_MUTEX(sysfs_mutex);
 #define PATH_PARALLEL_GENL_MES "/sys/kernel/parallel_genl/message"
 #define PATH_THIRD_GENL_MES "/sys/kernel/third_genl/message"
 
-// netlink attributes
+// TEST_GENL
 enum {
     MY_GENL_ATTR_UNSPEC,
     MY_GENL_ATTR_DATA,
@@ -141,7 +161,6 @@ enum {
 };
 #define MY_GENL_ATTR_MAX (__MY_GENL_ATTR_MAX - 1)
 
-// supported commands
 enum {
     MY_GENL_CMD_UNSPEC,
     MY_GENL_CMD_ECHO,
@@ -154,24 +173,22 @@ enum {
 #define MY_GENL_CMD_MAX (__MY_GENL_CMD_MAX - 1)
 
 enum {
-	MY_GENL_SMALL_CMD_GET_NESTED,
+	MY_GENL_SMALL_CMD_GET,
     MY_GENL_SMALL_CMD_ERROR,
 	__MY_GENL_SMALL_CMD_MAX,
 };
 
 #define MY_GENL_SMALL_CMD_MAX (__MY_GENL_SMALL_CMD_MAX - 1)
 
-
-// Validation policy for attributes
 static const struct nla_policy my_genl_policy[MY_GENL_ATTR_MAX + 1] = {
     [MY_GENL_ATTR_UNSPEC] = {.type = NLA_UNSPEC},
     [MY_GENL_ATTR_DATA]  = {.type = NLA_STRING},
-    [MY_GENL_ATTR_VALUE] = {.type = NLA_U32},
+    [MY_GENL_ATTR_VALUE] = {.type = NLA_U32, .validation_type = NLA_VALIDATE_RANGE, .min = 0, .max = 100},
     [MY_GENL_ATTR_PATH] = {.type = NLA_STRING},
     [MY_GENL_ATTR_NESTED] = {.type = NLA_NESTED},
 };
 
-/* My netlink family */
+/* netlink families */
 static struct genl_family my_genl_family;
 
 static struct genl_family my_genl_family_parallel;
@@ -207,32 +224,37 @@ static void my_genl_mcast_msg(struct sk_buff *mcast_skb, struct genl_info *info)
     }
 }
 
-// Functions for Generic Netlink
-static int my_genl_echo(struct sk_buff *skb, struct genl_info *info) {
+// Functions for Generic Netlink TEST_GENL family
+static int my_genl_echo(struct sk_buff *skb, struct genl_info *info) 
+{
     struct sk_buff *msg;
 	void *data;
 	int ret;
     char *str;
 
-	msg = genlmsg_new(GENLMSG_DEFAULT_SIZE, GFP_KERNEL);
-	if (!msg)
-		return -ENOMEM;
+    if (info->nlhdr->nlmsg_flags & NLM_F_ECHO) {
 
-	data = genlmsg_put_reply(msg, info, &my_genl_family, 0, MY_GENL_CMD_ECHO);
-    if (!data)
-		goto error;
+        msg = genlmsg_new(GENLMSG_DEFAULT_SIZE, GFP_KERNEL);
+        if (!msg)
+            return -ENOMEM;
 
-    str = "Hello to mcast groups!";
-    
-    strcpy(sysfs_data.genl_test_message, str);
+        data = genlmsg_put_reply(msg, info, &my_genl_family, 0, MY_GENL_CMD_ECHO);
+        if (!data)
+            goto error;
 
-	ret = nla_put_string(msg, MY_GENL_ATTR_DATA, str);
-	if (ret < 0)
-		goto error;
+        str = "Hello to mcast groups!";
+        
+        strcpy(sysfs_data.genl_test_message, str);
 
-	genlmsg_end(msg, data);
+        ret = nla_put_string(msg, MY_GENL_ATTR_DATA, str);
+        if (ret < 0)
+            goto error;
 
-	my_genl_mcast_msg(msg, info);
+        genlmsg_end(msg, data);
+
+        my_genl_mcast_msg(msg, info);
+
+    }
 
 	return 0;
 
@@ -241,7 +263,8 @@ error:
     return -EMSGSIZE;
 }
 
-static int my_genl_set_value(struct sk_buff *skb, struct genl_info *info) {
+static int my_genl_set_value(struct sk_buff *skb, struct genl_info *info) 
+{
     struct sk_buff *msg;
     void *msg_head;
     struct nlattr *na_path;
@@ -263,7 +286,7 @@ static int my_genl_set_value(struct sk_buff *skb, struct genl_info *info) {
 	new_value = nla_get_u32(na_value);
 
     if (new_value != 0 && new_value != 1) {
-        printk(KERN_ERR "New value is incorrect\n");
+        printk(KERN_ERR "my_genl_set_value: New value is incorrect\n");
         goto error;
     }
 
@@ -296,38 +319,39 @@ static int my_genl_set_value(struct sk_buff *skb, struct genl_info *info) {
 
     err = netlink_unicast(skb->sk, msg, info->snd_portid, 0);
     if (err < 0) {
-        printk(KERN_ERR "Error in netlink_sendskb, err=%d\n", err);
+        printk(KERN_ERR "my_genl_set_value: Error in netlink_unicast, err=%d\n", err);
         nlmsg_free(msg);
         return err;
     }
 
     return 0;
 
-    error:
-        // sending error ACK
-        code = -EINVAL;
-        
-        extack = kmalloc(sizeof(struct netlink_ext_ack), GFP_KERNEL);
-        if (!extack) {
-            printk(KERN_ERR "Failed to allocate memory for netlink_ext_ack\n");
-            return -ENOMEM;
-        }
-       
-        char cookie[NETLINK_MAX_COOKIE_LEN] = "000001";
-        extack->_msg = "Incorrect value from userspace";
-        extack->bad_attr = na_value;
-        extack->policy = my_genl_policy;
-        extack->cookie_len = strlen(cookie);
-        extack->miss_type = MY_GENL_ATTR_VALUE;
-        extack->miss_nest = attr;    // NULL;   
-        
-        nlh = nlmsg_hdr(skb);
-        netlink_ack(skb, nlh, code, extack);
-        printk(KERN_INFO "Message with TLV was sent\n");
-        return -EINVAL;
+error:
+    // sending error ACK
+    code = -EINVAL;
+    
+    extack = kmalloc(sizeof(*extack), GFP_KERNEL);
+    if (!extack) {
+        printk(KERN_ERR "my_genl_set_value: Failed to allocate memory for netlink_ext_ack\n");
+        return -ENOMEM;
+    }
+    
+    char cookie[NETLINK_MAX_COOKIE_LEN] = "000001";
+    extack->_msg = "Incorrect value from userspace";
+    extack->bad_attr = na_value;
+    extack->policy = my_genl_policy;
+    extack->cookie_len = strlen(cookie);
+    extack->miss_type = MY_GENL_ATTR_VALUE;
+    extack->miss_nest = attr; 
+    
+    nlh = nlmsg_hdr(skb);
+    netlink_ack(skb, nlh, code, extack);
+    printk(KERN_INFO "my_genl_set_value: Message with TLV was sent\n");
+    return -EINVAL;
 }
 
-static int my_genl_get_value(struct sk_buff *skb, struct genl_info *info) {
+static int my_genl_get_value(struct sk_buff *skb, struct genl_info *info) 
+{
     struct sk_buff *msg;
     void *msg_head;
     struct nlattr *na_path;
@@ -356,8 +380,8 @@ static int my_genl_get_value(struct sk_buff *skb, struct genl_info *info) {
     genl_lock();
 
     if (strcmp(sysfs_path, PATH_GENL_TEST_NUM) != 0) {
-        printk(KERN_ERR "Incorrect path: %s\n", sysfs_path);
-        goto socket_error;
+        printk(KERN_ERR "my_genl_get_value: Incorrect path: %s\n", sysfs_path);
+        goto error;
     }
 
     value = sysfs_data.genl_test_value;
@@ -373,7 +397,7 @@ static int my_genl_get_value(struct sk_buff *skb, struct genl_info *info) {
     if (info) {
         err = genlmsg_reply(msg, info);
         if (err != 0) {
-            printk(KERN_ERR "Error in genlmsg_reply, err=%d\n", err);
+            printk(KERN_ERR "my_genl_get_value: Error in genlmsg_reply, err=%d\n", err);
             nlmsg_free(msg);
             return err;
         }
@@ -382,13 +406,14 @@ static int my_genl_get_value(struct sk_buff *skb, struct genl_info *info) {
 
     return 0;
 
-    socket_error:
-        code = -ENOENT;  // No such file or directory
-        netlink_set_err(skb->sk, 0, MY_MCGRP_GENL, code);
-        return -ENOENT;
+error:
+    code = -EINVAL;
+    netlink_set_err(skb->sk, 0, MY_MCGRP_GENL, code);
+    return -EINVAL;
 }
 
-static int my_genl_no_attrs(struct sk_buff *skb, struct genl_info *info) {
+static int my_genl_no_attrs(struct sk_buff *skb, struct genl_info *info) 
+{
     struct sk_buff *msg;
     void *msg_head;
     int ret;
@@ -407,20 +432,20 @@ static int my_genl_no_attrs(struct sk_buff *skb, struct genl_info *info) {
     strcpy(sysfs_data.genl_test_message, str);
     
     if (nla_put_string(msg, MY_GENL_ATTR_DATA, str)) {
-        printk(KERN_ERR "Error with putting value to MY_GENL_ATTR_DATA");
+        printk(KERN_ERR "my_genl_no_attrs: Error with putting value to MY_GENL_ATTR_DATA");
         goto error;
     }
 
     genlmsg_end(msg, msg_head);
     return genlmsg_reply(msg, info);
 
-    error:
-        ret = -EMSGSIZE;
-        nlmsg_free(msg);
-        return ret;
+error:
+    ret = -EMSGSIZE;
+    nlmsg_free(msg);
+    return ret;
 }
 
-// Generic Netlink operations
+// Generic Netlink operations for TEST_GENL family
 static const struct genl_ops my_genl_ops[] = {
     {
         .cmd = MY_GENL_CMD_ECHO,
@@ -451,7 +476,7 @@ static const struct genl_ops my_genl_ops[] = {
     },
 };
 
-static int my_genl_get_nested(struct sk_buff *skb, struct genl_info *info)
+static int my_genl_small_cmd_get(struct sk_buff *skb, struct genl_info *info)
 {
 	struct sk_buff *msg;
 	void *reply;
@@ -472,28 +497,27 @@ static int my_genl_get_nested(struct sk_buff *skb, struct genl_info *info)
 
     if (nla_put_string(msg, MY_GENL_ATTR_DATA, str)) {
         nlmsg_free(msg);
-        printk(KERN_ERR "Error with putting value\n");
+        printk(KERN_ERR "my_genl_small_cmd_get: Error with putting value to MY_GENL_ATTR_DATA\n");
         return -EMSGSIZE;
     }
 
 	genlmsg_end(msg, reply);
 	return genlmsg_reply(msg, info);
 
-    error:
-        ret = -EMSGSIZE;
-        nlmsg_free(msg);
-        return ret;
+error:
+    ret = -EMSGSIZE;
+    nlmsg_free(msg);
+    return ret;
 }
 
 static const struct genl_small_ops my_genl_small_ops[] = {
     {
-		.cmd = MY_GENL_SMALL_CMD_GET_NESTED,
-		.doit = my_genl_get_nested,
-		// .dumpit = my_genl_get_nested_dump,
+		.cmd = MY_GENL_SMALL_CMD_GET,
+		.doit = my_genl_small_cmd_get,
 	},
 };
 
-// genl_family struct
+// genl_family struct for TEST_GENL family
 static struct genl_family my_genl_family = {
     .hdrsize = 0,
     .name = MY_GENL_FAMILY_NAME,
@@ -511,7 +535,7 @@ static struct genl_family my_genl_family = {
     .n_mcgrps = ARRAY_SIZE(genl_mcgrps),
 };
 
-// netlink attributes
+// PARALLEL_GENL family
 enum {
     PARALLEL_GENL_ATTR_UNSPEC,
     PARALLEL_GENL_ATTR_DATA,
@@ -530,7 +554,6 @@ enum {
 };
 #define PARALLEL_GENL_ATTR_MAX (__PARALLEL_GENL_ATTR_MAX - 1)
 
-// supported commands
 enum {
     PARALLEL_GENL_CMD_UNSPEC,
     PARALLEL_GENL_CMD_SEND,
@@ -541,15 +564,14 @@ enum {
 };
 #define PARALLEL_GENL_CMD_MAX (__PARALLEL_GENL_CMD_MAX - 1)
 
-// Validation policy for attributes
 static const struct nla_policy parallel_genl_policy[PARALLEL_GENL_ATTR_MAX + 1] = {
     [PARALLEL_GENL_ATTR_UNSPEC] = {.type = NLA_UNSPEC},
     [PARALLEL_GENL_ATTR_DATA]  = {.type = NLA_STRING},
     [PARALLEL_GENL_ATTR_BINARY] = {.type = NLA_BINARY},
-    [PARALLEL_GENL_ATTR_NAME] = {.type = NLA_NUL_STRING},    // \0 at the end of the string
+    [PARALLEL_GENL_ATTR_NAME] = {.type = NLA_NUL_STRING},
     [PARALLEL_GENL_ATTR_DESC] = {.type = NLA_NUL_STRING},
     [PARALLEL_GENL_ATTR_BITFIELD32] = {.type = NLA_BITFIELD32},
-    [PARALLEL_GENL_ATTR_SIGN_NUM] = {.type = NLA_S32},
+    [PARALLEL_GENL_ATTR_SIGN_NUM] = {.type = NLA_S32, .validation_type = NLA_VALIDATE_RANGE, .min = -100, .max = 100},
     [PARALLEL_GENL_ATTR_ARRAY] = {.type = NLA_NESTED_ARRAY},
     [PARALLEL_GENL_ATTR_NESTED] = {.type = NLA_NESTED},
     [PARALLEL_GENL_ATTR_FLAG_NONBLOCK] = {.type = NLA_FLAG},
@@ -566,6 +588,7 @@ static int parallel_genl_send(struct sk_buff *skb, struct genl_info *info)
     char *str;
 
 	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+
 	if (!msg)
 		return -ENOMEM;
 
@@ -579,7 +602,7 @@ static int parallel_genl_send(struct sk_buff *skb, struct genl_info *info)
 
     if (nla_put_string(msg, PARALLEL_GENL_ATTR_DATA, str)) {
         nlmsg_free(msg);
-        printk(KERN_ERR "Error with putting value\n");
+        printk(KERN_ERR "parallel_genl_send: Error with putting value to PARALLEL_GENL_ATTR_DATA\n");
         return -EMSGSIZE;
     }
 
@@ -597,30 +620,22 @@ error:
 
 overrun_nonblock:
     skb->sk->sk_sndtimeo = 1000;
-    // printk(KERN_INFO "start overrun for nonblock socket in parallel_genl_send\n");
-    
-    ret = netlink_unicast(skb->sk, msg, info->snd_portid, 1);   // 1 неблокирующий сокет
+    ret = netlink_unicast(skb->sk, msg, info->snd_portid, 1);
     if (ret < 0) {
-        // printk(KERN_ERR "Error in netlink_unicast, err=%d\n", ret);
         return ret;
     }
-    // printk(KERN_INFO "netlink_unicast with overrun done");
     return 0;
 
 overrun_block:
-    // printk(KERN_INFO "socket timeo for block socket is %ld", skb->sk->sk_sndtimeo);
-    // printk(KERN_INFO "start overrun for block socket in parallel_genl_send\n");
-    
-    ret = netlink_unicast(skb->sk, msg, info->snd_portid, 0);   // 0 блокирующий сокет
+    ret = netlink_unicast(skb->sk, msg, info->snd_portid, 0);
     if (ret < 0) {
-        // printk(KERN_ERR "Error in netlink_unicast, err=%d\n", ret);
         return ret;
     }
-    // printk(KERN_INFO "netlink_unicast with overrun done");
     return 0;
 }
 
-static int parallel_genl_set_str_value(struct sk_buff *skb, struct genl_info *info) {
+static int parallel_genl_set_str_value(struct sk_buff *skb, struct genl_info *info) 
+{
     struct sk_buff *msg;
     void *msg_head;
     struct nlattr *na_path;
@@ -631,7 +646,7 @@ static int parallel_genl_set_str_value(struct sk_buff *skb, struct genl_info *in
     int data_len;
 
     if (!info->attrs[PARALLEL_GENL_ATTR_DATA]) {
-        printk(KERN_INFO "my_genl_set_str_value: Missing PARALLEL_GENL_ATTR_DATA\n");
+        printk(KERN_INFO "parallel_genl_set_str_value: Missing PARALLEL_GENL_ATTR_DATA\n");
 		return -EINVAL;
     }
 
@@ -649,7 +664,7 @@ static int parallel_genl_set_str_value(struct sk_buff *skb, struct genl_info *in
 
     na_path = info->attrs[PARALLEL_GENL_ATTR_PATH];
     if (!na_path) {
-        printk(KERN_INFO "my_genl_set_str_value: Missing PARALLEL_GENL_ATTR_PATH\n");
+        printk(KERN_INFO "parallel_genl_set_str_value: Missing PARALLEL_GENL_ATTR_PATH\n");
 		return -EINVAL;
     }
     sysfs_path = nla_data(na_path);
@@ -676,7 +691,7 @@ static int parallel_genl_set_str_value(struct sk_buff *skb, struct genl_info *in
 
     err = netlink_unicast(skb->sk, msg, info->snd_portid, 0);
     if (err < 0) {
-        printk(KERN_ERR "Error in netlink_sendskb, err=%d\n", err);
+        printk(KERN_ERR "parallel_genl_set_str_value: Error in netlink_unicast, err=%d\n", err);
         nlmsg_free(msg);
         return err;
     }
@@ -685,7 +700,8 @@ static int parallel_genl_set_str_value(struct sk_buff *skb, struct genl_info *in
     return 0;
 }
 
-static int parallel_genl_get_str_value(struct sk_buff *skb, struct genl_info *info) {
+static int parallel_genl_get_str_value(struct sk_buff *skb, struct genl_info *info) 
+{
     struct sk_buff *msg;
     void *msg_head;
     struct nlattr *na_path;
@@ -714,8 +730,8 @@ static int parallel_genl_get_str_value(struct sk_buff *skb, struct genl_info *in
     genl_lock();
 
     if (strcmp(sysfs_path, PATH_PARALLEL_GENL_MES) != 0) {
-        printk(KERN_ERR "Incorrect path: %s\n", sysfs_path);
-        goto socket_error;
+        printk(KERN_ERR "parallel_genl_get_str_value: Incorrect path: %s\n", sysfs_path);
+        goto error;
     }
 
     value = kmalloc(MAX_DATA_LEN, GFP_KERNEL);
@@ -738,7 +754,7 @@ static int parallel_genl_get_str_value(struct sk_buff *skb, struct genl_info *in
     if (info) {
         err = genlmsg_reply(msg, info);
         if (err != 0) {
-            printk(KERN_ERR "Error in genlmsg_reply, err=%d\n", err);
+            printk(KERN_ERR "parallel_genl_get_str_value: Error in genlmsg_reply, err=%d\n", err);
             nlmsg_free(msg);
             kfree(value);
             return err;
@@ -749,11 +765,11 @@ static int parallel_genl_get_str_value(struct sk_buff *skb, struct genl_info *in
 
     return 0;
 
-    socket_error:
-        nlmsg_free(msg);
-        code = -ENOENT;
-        netlink_set_err(skb->sk, 0, MY_MCGRP_GENL, code);
-        return -ENOENT;
+error:
+    nlmsg_free(msg);
+    code = -ENOENT;
+    netlink_set_err(skb->sk, 0, MY_MCGRP_GENL, code);
+    return -ENOENT;
 }
 
 struct parallel_data {
@@ -769,8 +785,9 @@ struct parallel_data data[] = {
 };
 #define DATA_SIZE ARRAY_SIZE(data)
 
-static int parallel_genl_dump_start(struct netlink_callback *cb) {
-    printk(KERN_INFO "Dump is started");
+static int parallel_genl_dump_start(struct netlink_callback *cb) 
+{
+    printk(KERN_INFO "parallel_genl_dump_start: Dump is started");
     return 0;
 }
 
@@ -805,14 +822,13 @@ nla_put_failure:
 static int parallel_genl_dump_info(struct sk_buff *skb, struct netlink_callback *cb)
 {
     int ret;
-    int idx = cb->args[0];   // index for current element
+    int idx = cb->args[0];
 
     for (;;) {
         if (idx >= DATA_SIZE) {  
-            return 0;            // dump is over
+            return 0;            
         }
 
-        // One element for msg
         ret = __parallel_genl_dump_element(&data[idx], NETLINK_CB(cb->skb).portid,
                 cb->nlh->nlmsg_seq, NLM_F_MULTI, skb,
                 PARALLEL_GENL_CMD_DUMP_INFO);
@@ -822,7 +838,7 @@ static int parallel_genl_dump_info(struct sk_buff *skb, struct netlink_callback 
             return ret;
         }
 
-        cb->args[0]++;   // next element
+        cb->args[0]++; 
         idx++;
     }
 
@@ -831,11 +847,11 @@ static int parallel_genl_dump_info(struct sk_buff *skb, struct netlink_callback 
 
 static int parallel_genl_dump_done(struct netlink_callback *cb)
 {
-    printk(KERN_INFO "Dump is done");
+    printk(KERN_INFO "parallel_genl_dump_done: Dump is done");
 	return 0;
 }
 
-// Generic Netlink operations
+// Generic Netlink operations for PARALLEL_GENL family
 static const struct genl_ops parallel_genl_ops[] = {
     {
         .cmd = PARALLEL_GENL_CMD_SEND,
@@ -855,7 +871,7 @@ static const struct genl_ops parallel_genl_ops[] = {
     {
         .cmd = PARALLEL_GENL_CMD_SET_VALUE,
         .flags = 0,
-        .policy = NULL,    // parallel_genl_policy,
+        .policy = NULL,
         .doit = parallel_genl_set_str_value,
         .dumpit = NULL,
     },
@@ -1415,7 +1431,7 @@ static const struct genl_multicast_group genl_many_mcgrps_two[] = {
     [MCGRP_TWO_69] = { .name = "MCGRP_TWO_69", },
 };
 
-// second genl_family struct
+// genl_family struct for PARALLEL_GENL family
 static struct genl_family my_genl_family_parallel = {
     .hdrsize = 0,
     .name = PARALLEL_GENL_FAMILY_NAME,
@@ -1431,7 +1447,7 @@ static struct genl_family my_genl_family_parallel = {
     .n_mcgrps = ARRAY_SIZE(genl_many_mcgrps_two),
 };
 
-// netlink attributes
+// THIRD_GENL
 enum {
     THIRD_GENL_ATTR_UNSPEC,
     THIRD_GENL_ATTR_DATA,
@@ -1440,8 +1456,6 @@ enum {
 };
 #define THIRD_GENL_ATTR_MAX (__THIRD_GENL_ATTR_MAX - 1)
 
-
-// supported commands
 enum {
     THIRD_GENL_CMD_UNSPEC,
     THIRD_GENL_CMD_ECHO,
@@ -1449,43 +1463,45 @@ enum {
 };
 #define THIRD_GENL_CMD_MAX (__THIRD_GENL_CMD_MAX - 1)
 
-// Validation policy for attributes
 static const struct nla_policy third_genl_policy[THIRD_GENL_ATTR_MAX + 1] = {
     [THIRD_GENL_ATTR_UNSPEC] = {.type = NLA_UNSPEC},
     [THIRD_GENL_ATTR_DATA]  = {.type = NLA_STRING},
     [THIRD_GENL_ATTR_FLAG] = {.type = NLA_FLAG},
 };
 
-// Functions for third Generic Netlink
-static int third_genl_echo(struct sk_buff *skb, struct genl_info *info) {
+// Functions for THIRD_GENL family
+static int third_genl_echo(struct sk_buff *skb, struct genl_info *info) 
+{
     struct sk_buff *msg;
 	void *data;
 	int ret;
     char *str;
 
-	msg = genlmsg_new(GENLMSG_DEFAULT_SIZE, GFP_KERNEL);
-	if (!msg)
-		return -ENOMEM;
+    if (info->nlhdr->nlmsg_flags & NLM_F_ECHO) {
 
-	data = genlmsg_put_reply(msg, info, &my_genl_family, 0, THIRD_GENL_CMD_ECHO);
-    if (!data)
-		goto error;
+        msg = genlmsg_new(GENLMSG_DEFAULT_SIZE, GFP_KERNEL);
+        if (!msg)
+            return -ENOMEM;
 
-    str = "Hello from THIRD_GENL!";
-    strcpy(sysfs_data.third_genl_message, str);
+        data = genlmsg_put_reply(msg, info, &my_genl_family, 0, THIRD_GENL_CMD_ECHO);
+        if (!data)
+            goto error;
 
-	ret = nla_put_string(msg, THIRD_GENL_ATTR_DATA, str);
-	if (ret < 0)
-		goto error;
+        str = "Hello from THIRD_GENL!";
+        strcpy(sysfs_data.third_genl_message, str);
 
-    ret = nla_put_flag(msg, THIRD_GENL_ATTR_FLAG);
-	if (ret < 0)
-		goto error;
+        ret = nla_put_string(msg, THIRD_GENL_ATTR_DATA, str);
+        if (ret < 0)
+            goto error;
 
-	genlmsg_end(msg, data);
+        ret = nla_put_flag(msg, THIRD_GENL_ATTR_FLAG);
+        if (ret < 0)
+            goto error;
 
-    genlmsg_reply(msg, info);
-	// my_genl_mcast_msg(msg, info);
+        genlmsg_end(msg, data);
+
+        genlmsg_reply(msg, info);
+    }
 
 	return 0;
 
@@ -1494,7 +1510,7 @@ error:
     return -EMSGSIZE;
 }
 
-// Generic Netlink operations
+// Generic Netlink operations for THIRD_GENL family
 static const struct genl_ops third_genl_ops[] = {
     {
         .cmd = THIRD_GENL_CMD_ECHO,
@@ -1505,7 +1521,7 @@ static const struct genl_ops third_genl_ops[] = {
     },
 };
 
-// third genl_family struct
+// genl_family struct for THIRD_GENL family
 static struct genl_family third_genl_family = {
     .hdrsize = 0,
     .name = THIRD_GENL_FAMILY_NAME,
@@ -1517,7 +1533,7 @@ static struct genl_family third_genl_family = {
     .policy = third_genl_policy,
 };
 
-// supported commands
+// LARGE_GENL
 enum {
     LARGE_GENL_CMD_UNSPEC,
     LARGE_GENL_CMD_ECHO,
@@ -1525,12 +1541,12 @@ enum {
 };
 #define LARGE_GENL_CMD_MAX (__LARGE_GENL_CMD_MAX - 1)
 
-
-static int large_genl_echo(struct sk_buff *skb, struct genl_info *info) {
+static int large_genl_echo(struct sk_buff *skb, struct genl_info *info) 
+{
     return 0; 
 }
 
-// Generic Netlink operations
+// Generic Netlink operations for LARGE_GENL family
 static const struct genl_ops large_genl_ops[] = {
     {
         .cmd = LARGE_GENL_CMD_ECHO,
@@ -1540,7 +1556,7 @@ static const struct genl_ops large_genl_ops[] = {
     },
 };
 
-// large genl_family struct
+// genl_family struct for LARGE_GENL family
 static struct genl_family large_genl_family = {
     .hdrsize = 0,
     .name = LARGE_GENL_FAMILY_NAME,
@@ -1549,12 +1565,11 @@ static struct genl_family large_genl_family = {
     .netnsok = true,
     .ops = large_genl_ops,
     .n_ops = ARRAY_SIZE(large_genl_ops),
-    // .policy = third_genl_policy,
     .mcgrps = genl_many_mcgrps_one,
     .n_mcgrps = ARRAY_SIZE(genl_many_mcgrps_one),
 };
 
-// incorrect name for genl_family struct
+// genl_family struct with incorrect name
 static struct genl_family incorrect_genl_family = {
     .hdrsize = 0,
     .name = MY_GENL_FAMILY_NAME,   // such family already exists
@@ -1570,7 +1585,7 @@ enum {
     INCORRECT_OP_WITH_NULL,
 };
 
-// Generic Netlink operations
+// Generic Netlink operations with incorrect ops
 static const struct genl_ops incorrect_ops_with_null[] = {
     {
         .cmd = INCORRECT_OP_WITH_NULL,
@@ -1581,7 +1596,7 @@ static const struct genl_ops incorrect_ops_with_null[] = {
     },
 };
 
-// incorrect ops for genl_family struct
+// genl_family struct with incorrect ops
 static struct genl_family incorrect_ops_genl_family = {
     .hdrsize = 0,
     .name = "INCORRECT",
@@ -1606,29 +1621,29 @@ static int __init init_netlink(void)
 {
 	int rc;
 
-	printk(KERN_INFO "My module: initializing Netlink\n");
+	printk(KERN_INFO "init_netlink: My module. Initializing Netlink\n");
 
 	rc = genl_register_family(&my_genl_family);
 	if (rc) {
-        printk(KERN_ERR "Failed to register Generic Netlink family\n");
+        printk(KERN_ERR "init_netlink: Failed to register Generic Netlink family\n");
 		goto failure_1;
     }
 
     rc = genl_register_family(&my_genl_family_parallel);
 	if (rc) {
-        printk(KERN_ERR "Failed to register Generic Netlink family\n");
+        printk(KERN_ERR "init_netlink: Failed to register Generic Netlink family\n");
 		goto failure_2;
     }
 
     rc = genl_register_family(&large_genl_family);
     if (rc) {
-        printk(KERN_ERR "Failed to register Generic Netlink family\n");
+        printk(KERN_ERR "init_netlink: Failed to register Generic Netlink family\n");
 		goto failure_3;
     }
 
     rc = genl_register_family(&third_genl_family);
     if (rc) {
-        printk(KERN_ERR "Failed to register Generic Netlink family\n");
+        printk(KERN_ERR "init_netlink: Failed to register Generic Netlink family\n");
 		goto failure_4;
     }
 
@@ -1640,11 +1655,12 @@ failure_3:
 failure_2:
     genl_unregister_family(&my_genl_family);
 failure_1:
-	pr_debug("My module: error occurred in %s\n", __func__);
+	pr_debug("init_netlink: My module. Error occurred in %s\n", __func__);
 	return rc;
 }
 
-static int __init incorrect_ops_netlink(void) {
+static int __init incorrect_ops_netlink(void) 
+{
     int ret;
     ret = genl_register_family(&incorrect_ops_genl_family);
     if (ret != -EINVAL)
@@ -1656,105 +1672,112 @@ static int __init incorrect_init_netlink(void)
 {
 	int rc;
 
-	printk(KERN_INFO "My module: initializing incorrect Netlink\n");
+	printk(KERN_INFO "incorrect_init_netlink: My module. Initializing incorrect Netlink\n");
 
 	rc = genl_register_family(&incorrect_genl_family);
 	if (rc) {
-        printk(KERN_ERR "Failed to register Generic Netlink family\n");
+        printk(KERN_ERR "incorrect_init_netlink: Failed to register incorrect Generic Netlink family\n");
 		goto failure;
     }
 
 	return 0;
 
 failure:
-	pr_debug("My module: error occurred in %s\n", __func__);
+	printk(KERN_INFO "incorrect_init_netlink: Error was handled correctly\n");
 	return -EINVAL;
 }
 
-static int __init init_sysfs_third_genl(void) {
+static int __init init_sysfs_third_genl(void) 
+{
     int ret;
 
     kobj_third_genl = kobject_create_and_add("third_genl", kernel_kobj);
     
     if (!kobj_third_genl) {
-            printk(KERN_ERR "Failed to create kobject\n");
+            printk(KERN_ERR "init_sysfs_third_genl: Failed to create kobject\n");
             return -ENOMEM;
     }  
 
     ret = sysfs_create_file(kobj_third_genl, &my_attr_str_third_genl.attr);
     if (ret) {
-            printk(KERN_ERR "Failed to create sysfs file\n");
+            printk(KERN_ERR "init_sysfs_third_genl: Failed to create sysfs file\n");
             goto err_sysfs;
     }
 
     return 0;
-    err_sysfs:
-        kobject_put(kobj_third_genl);
-        return ret;
+
+err_sysfs:
+    kobject_put(kobj_third_genl);
+    return ret;
 }
 
-static int __init init_sysfs_parallel_genl(void) {
+static int __init init_sysfs_parallel_genl(void) 
+{
     int ret;
 
     kobj_parallel_genl = kobject_create_and_add("parallel_genl", kernel_kobj);
     
     if (!kobj_parallel_genl) {
-            printk(KERN_ERR "Failed to create kobject\n");
+            printk(KERN_ERR "init_sysfs_parallel_genl: Failed to create kobject\n");
             return -ENOMEM;
     }  
 
     ret = sysfs_create_file(kobj_parallel_genl, &my_attr_str_parallel_genl.attr);
     if (ret) {
-            printk(KERN_ERR "Failed to create sysfs file\n");
+            printk(KERN_ERR "init_sysfs_parallel_genl: Failed to create sysfs file\n");
             goto err_sysfs;
     }
 
     return 0;
-    err_sysfs:
-        kobject_put(kobj_parallel_genl);
-        return ret;
+
+err_sysfs:
+    kobject_put(kobj_parallel_genl);
+    return ret;
 }
 
-static int __init init_sysfs_genl_test(void) {
+static int __init init_sysfs_genl_test(void) 
+{
     int ret;
 
     kobj_genl_test = kobject_create_and_add("genl_test", kernel_kobj);
     dev_genl_test = kobj_to_dev(kobj_genl_test);
     
     if (!kobj_genl_test) {
-        printk(KERN_ERR "Failed to create kobject\n");
+        printk(KERN_ERR "init_sysfs_genl_test: Failed to create kobject\n");
         return -ENOMEM;
     }  
 
     ret = sysfs_create_file(kobj_genl_test, &my_attr_u32_genl_test.attr);
     if (ret) {
-        printk(KERN_ERR "Failed to create sysfs file 1\n");
+        printk(KERN_ERR "init_sysfs_genl_test: Failed to create sysfs file 1\n");
         goto err_sysfs;
     }
 
     ret = sysfs_create_file(kobj_genl_test, &my_attr_str_genl_test.attr);
     if (ret) {
-        printk(KERN_ERR "Failed to create sysfs file 2\n");
+        printk(KERN_ERR "init_sysfs_genl_test: Failed to create sysfs file 2\n");
         goto err_sysfs_2;
     }
 
     ret = device_create_file(dev_genl_test, &dev_attr_info_genl_test);
     if (ret) {
-        printk(KERN_ERR "Failed to create device file\n");
+        printk(KERN_ERR "init_sysfs_genl_test: Failed to create device file\n");
         goto err_device;
     };
 
     return 0;
-    err_device:
-        sysfs_remove_file(kobj_genl_test, &my_attr_str_genl_test.attr);
-    err_sysfs_2:
-        sysfs_remove_file(kobj_genl_test, &my_attr_u32_genl_test.attr);
-    err_sysfs:
-        kobject_put(kobj_genl_test);
-        return ret;
+
+err_device:
+    sysfs_remove_file(kobj_genl_test, &my_attr_str_genl_test.attr);
+err_sysfs_2:
+    sysfs_remove_file(kobj_genl_test, &my_attr_u32_genl_test.attr);
+err_sysfs:
+    kobject_put(kobj_genl_test);
+    return ret;
 }
 
-static int __init my_sysfs_init(void) {
+static int __init my_sysfs_init(void) 
+{
     int ret;
 
     ret = init_sysfs_genl_test();
@@ -1774,22 +1797,18 @@ static int __init my_sysfs_init(void) {
         goto err_sysfs;
 
     ret = init_netlink();
-    if (ret == -ENOMEM)
-        printk(KERN_INFO "here was fault injection -- good behavior");
     if (ret)
         goto err_sysfs;
-    printk(KERN_INFO "New families is registered\n");
+    printk(KERN_INFO "my_sysfs_init: New families are registered\n");
 
     ret = incorrect_init_netlink();
     if (ret)
-        printk(KERN_ERR "Error occured - predicted behaviour\n");;
-    printk(KERN_INFO "Error is correct\n");
+        printk(KERN_ERR "my_sysfs_init: Incorrect Generic Netlink family wasn't registered\n");
 
     ret = genl_unregister_family(&incorrect_genl_family);
     if (ret) {
-        printk(KERN_ERR "Error occured - predicted behaviour\n");
+        printk(KERN_ERR "my_sysfs_init: Incorrect Generic Netlink family wasn't unregistered\n");
     }
-    printk(KERN_INFO "Error is correct\n");
 
     ret = netlink_register_notifier(&genl_notifier);
     if (ret)
@@ -1797,28 +1816,28 @@ static int __init my_sysfs_init(void) {
 
     return 0;
 
-    // err_notifier:
-        netlink_unregister_notifier(&genl_notifier);
-    err_family:
-        genl_unregister_family(&my_genl_family);
-        genl_unregister_family(&my_genl_family_parallel);
-        genl_unregister_family(&third_genl_family);
-        genl_unregister_family(&large_genl_family);
-    err_sysfs:
-        sysfs_remove_file(kobj_genl_test, &my_attr_u32_genl_test.attr);
-        sysfs_remove_file(kobj_genl_test, &my_attr_str_genl_test.attr);
-        device_remove_file(dev_genl_test, &dev_attr_info_genl_test);
-        kobject_put(kobj_genl_test);
+    // netlink_unregister_notifier(&genl_notifier);
+err_family:
+    genl_unregister_family(&my_genl_family);
+    genl_unregister_family(&my_genl_family_parallel);
+    genl_unregister_family(&third_genl_family);
+    genl_unregister_family(&large_genl_family);
+err_sysfs:
+    sysfs_remove_file(kobj_genl_test, &my_attr_u32_genl_test.attr);
+    sysfs_remove_file(kobj_genl_test, &my_attr_str_genl_test.attr);
+    device_remove_file(dev_genl_test, &dev_attr_info_genl_test);
+    kobject_put(kobj_genl_test);
 
-        sysfs_remove_file(kobj_parallel_genl, &my_attr_str_parallel_genl.attr);
-        kobject_put(kobj_parallel_genl);
-        
-        sysfs_remove_file(kobj_third_genl, &my_attr_str_third_genl.attr);
-        kobject_put(kobj_third_genl);
-        return ret;
+    sysfs_remove_file(kobj_parallel_genl, &my_attr_str_parallel_genl.attr);
+    kobject_put(kobj_parallel_genl);
+    
+    sysfs_remove_file(kobj_third_genl, &my_attr_str_third_genl.attr);
+    kobject_put(kobj_third_genl);
+    return ret;
 }
 
-static void __exit my_sysfs_exit(void) {
+static void __exit my_sysfs_exit(void) 
+{
     netlink_unregister_notifier(&genl_notifier);
     genl_unregister_family(&my_genl_family);
     genl_unregister_family(&my_genl_family_parallel);
@@ -1835,7 +1854,7 @@ static void __exit my_sysfs_exit(void) {
     
     sysfs_remove_file(kobj_third_genl, &my_attr_str_third_genl.attr);
     kobject_put(kobj_third_genl);
-    printk(KERN_INFO "Module is exited\n");
+    printk(KERN_INFO "my_sysfs_exit: Module is exited\n");
 }
 
 module_init(my_sysfs_init);
