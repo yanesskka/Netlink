@@ -1341,6 +1341,11 @@ static int __init my_sysfs_init(void)
     if (ret)
         printk(KERN_ERR "my_sysfs_init: Incorrect Generic Netlink family wasn't registered\n");
 
+    ret = genl_unregister_family(&incorrect_genl_family);
+    if (ret) {
+        printk(KERN_ERR "my_sysfs_init: Incorrect Generic Netlink family wasn't unregistered\n");
+    }
+
     ret = netlink_register_notifier(&genl_notifier);
     if (ret)
         goto err_family;
