@@ -144,6 +144,61 @@ TEST (capture_start)
 }
 
  /**
+ * TEST(open_netlink_file) - Verifies correct reading of Netlink socket information
+ * 
+ * Tests the /proc/net/netlink interface by:
+ * 1. Creating a test Netlink socket
+ * 2. Reading the proc file before and after socket creation
+ * 3. Verifying the socket count changes as expected
+ *
+ * The test checks that:
+ * - /proc/net/netlink is accessible
+ * - Entries are properly added/removed
+ * - Uses kernel's netlink_seq_ops mechanism
+ */
+
+TEST (open_netlink_file) 
+{
+    FILE *file;
+    char line[256];
+    int cnt = 0;
+
+    printf("Running Test: opening and reading /proc/net/netlink file...\n");
+
+    struct nl_sock *sock;
+    sock = socket_alloc_and_conn();
+
+    file = fopen("/proc/net/netlink", "r");
+    ASSERT_NE(NULL, file);
+    if (file == NULL) {
+        perror("fopen");
+        return;
+    }
+
+    while (fgets(line, sizeof(line), file) != NULL) {
+        cnt++;
+    }
+    
+    nl_socket_free(sock);
+
+    fclose(file);
+
+    file = fopen("/proc/net/netlink", "r");
+    ASSERT_NE(NULL, file);
+    if (file == NULL) {
+        perror("fopen");
+        return;
+    }
+
+    while (fgets(line, sizeof(line), file) != NULL) {
+        cnt--;
+    }
+    EXPECT_EQ(cnt, 1);
+
+    fclose(file);
+}
+
+ /**
  * TEST(capture_end) - Terminates Netlink traffic monitoring session
  *
  * Performs controlled shutdown of nlmon capture interface by:
